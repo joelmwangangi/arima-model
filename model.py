@@ -7,7 +7,7 @@ st.set_page_config(page_title="ARIMA Model GUI", layout="wide")
 st.title("ARIMA Model GUI")
 
 # 1) Configure your data source URL
-DATA_URL = "https://raw.githubusercontent.com/<username>/<repo>/main/aapl_1y.csv"
+DATA_URL = "https://github.com/joelmwangangi/arima-model/blob/1d871b0560e6dbf54779f8db3df2ca3dce736b4d/aapl_1y.csv"
 
 @st.cache_data
 def load_data(url: str) -> pd.DataFrame:
