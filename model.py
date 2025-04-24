@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 # Title and description
 st.title("ARIMA Model for Time Series Analysis")
-st.write("This application demonstrates ARIMA modeling and forecasting using your dataset.")
+st.write("Analyze and forecast trends using ARIMA modeling, focusing on data from 2023 onward.")
 
 # Load the dataset
 @st.cache_data
@@ -13,6 +13,9 @@ def load_data():
     return pd.read_csv("aapl_1y.csv", parse_dates=["Date"], index_col="Date")
 
 data = load_data()
+
+# Filter data to start from 2023
+data = data.loc[data.index >= pd.Timestamp("2023-01-01")]
 
 # Show dataset preview
 st.subheader("Dataset Preview")
@@ -25,7 +28,7 @@ else:
     # Prepare data for ARIMA
     time_series = data["Close"]
 
-    # Model order selection
+    # Sidebar for ARIMA order selection
     st.sidebar.subheader("ARIMA Order Selection")
     p = st.sidebar.number_input("AR Order (p)", min_value=0, max_value=5, value=1, step=1)
     d = st.sidebar.number_input("Difference Order (d)", min_value=0, max_value=5, value=1, step=1)
@@ -47,6 +50,10 @@ else:
     st.subheader("Forecast Plot")
     plt.figure(figsize=(10, 5))
     plt.plot(time_series, label="Original Data")
-    plt.plot(forecast, label="Forecast", color="orange")
+    plt.plot(pd.date_range(start=time_series.index[-1], periods=forecast_steps + 1, freq='B')[1:], 
+             forecast, label="Forecast", color="orange")
     plt.legend()
+    plt.xlabel("Date")
+    plt.ylabel("Close Price")
+    plt.title("ARIMA Forecast Starting from 2023 Data")
     st.pyplot(plt)
