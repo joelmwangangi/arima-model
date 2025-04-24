@@ -1,88 +1,52 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-from statsmodels.tsa.arima.model import ARIMA
 import streamlit as st
+from statsmodels.tsa.arima.model import ARIMA
+import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="ARIMA Model GUI", layout="wide")
-st.title("ARIMA Model GUI")
+# Title and description
+st.title("ARIMA Model for Time Series Analysis")
+st.write("This application demonstrates ARIMA modeling and forecasting using your dataset.")
 
-# 1) Configure your data source URL
-DATA_URL = "https://github.com/joelmwangangi/arima-model/aapl_1y.csv"
-
+# Load the dataset
 @st.cache_data
-def load_data(url: str) -> pd.DataFrame:
-    # Load without parse_dates
-    df = pd.read_csv(url)
-    # Detect and normalize a date column
-    for col in ("Date", "date", "timestamp", "Datetime"):
-        if col in df.columns:
-            df["Date"] = pd.to_datetime(df[col])
-            break
-    else:
-        st.error(
-            "No date column found in the CSV. "
-            "Expected one of: Date, date, timestamp, Datetime."
-        )
-        st.stop()
-    return df
+def load_data():
+    return pd.read_csv("aapl_1y.csv", parse_dates=["Date"], index_col="Date")
 
-# 2) Automatically load the data
-try:
-    df = load_data(DATA_URL)
-    st.success("Data loaded successfully!")
-except Exception as e:
-    st.error(f"Could not load data from URL:\n{e}")
-    st.stop()
+data = load_data()
 
-# 3) Show data preview
-st.subheader("Data Preview")
-st.dataframe(df.head())
+# Show dataset preview
+st.subheader("Dataset Preview")
+st.write(data.head())
 
-# Sidebar: model controls
-st.sidebar.header("Model Settings")
+# Ensure 'Close' column is in the data for ARIMA modeling
+if "Close" not in data.columns:
+    st.error("The dataset must contain a 'Close' column for ARIMA modeling.")
+else:
+    # Prepare data for ARIMA
+    time_series = data["Close"]
 
-order = st.sidebar.text_input(
-    "ARIMA order (p, d, q)",
-    value="1,1,1",
-    help="Enter three integers separated by commas, e.g. 1,1,1"
-)
+    # Model order selection
+    st.sidebar.subheader("ARIMA Order Selection")
+    p = st.sidebar.number_input("AR Order (p)", min_value=0, max_value=5, value=1, step=1)
+    d = st.sidebar.number_input("Difference Order (d)", min_value=0, max_value=5, value=1, step=1)
+    q = st.sidebar.number_input("MA Order (q)", min_value=0, max_value=5, value=0, step=1)
 
-fit_button = st.sidebar.button("Fit ARIMA Model")
-results = None
-if fit_button:
-    if "Close" not in df.columns:
-        st.sidebar.error("No 'Close' column found in the data.")
-    else:
-        try:
-            p, d, q = map(int, order.split(","))
-            series = df["Close"]
-            model = ARIMA(series, order=(p, d, q))
-            results = model.fit()
-            st.sidebar.success(f"Model fitted! AIC: {results.aic:.2f}")
-        except Exception as e:
-            st.sidebar.error(f"Failed to fit model: {e}")
+    # Fit ARIMA model
+    model = ARIMA(time_series, order=(p, d, q))
+    model_fit = model.fit()
 
-# 4) Plot time series
-if st.sidebar.checkbox("Show Time Series Plot"):
-    if "Close" not in df.columns:
-        st.warning("No 'Close' column found to plot.")
-    else:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.plot(df["Date"], df["Close"], label="Close Price")
-        ax.set_title("Close Price Over Time")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Close Price")
-        ax.grid(True)
-        st.pyplot(fig)
+    # Display model summary
+    st.subheader("ARIMA Model Summary")
+    st.text(model_fit.summary())
 
-# 5) Display summary & forecast
-if results is not None:
-    st.subheader("Model Summary")
-    st.text(results.summary().as_text())
+    # Forecasting
+    forecast_steps = st.sidebar.number_input("Forecast Steps", min_value=1, max_value=30, value=10, step=1)
+    forecast = model_fit.forecast(steps=forecast_steps)
 
-    st.subheader("Forecast")
-    steps = st.number_input("Forecast steps", min_value=1, max_value=100, value=10)
-    if st.button("Generate Forecast"):
-        fc = results.forecast(steps=steps)
-        st.line_chart(fc)
-        st.dataframe(pd.DataFrame({"Forecast": fc}))
+    # Plot forecast
+    st.subheader("Forecast Plot")
+    plt.figure(figsize=(10, 5))
+    plt.plot(time_series, label="Original Data")
+    plt.plot(forecast, label="Forecast", color="orange")
+    plt.legend()
+    st.pyplot(plt)
