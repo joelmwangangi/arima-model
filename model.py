@@ -3,76 +3,68 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.arima.model import ARIMA
 import streamlit as st
 
-# Function to load the dataset
-def load_file():
-    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
-    if uploaded_file is not None:
-        # Load the CSV file into a pandas DataFrame
-        dataset = pd.read_csv(uploaded_file, parse_dates=["Date"])
-        st.write("Data preview:", dataset.head())
-        return dataset
-    return None
+# 1) Configure your data source here:
+DATA_URL = "https://github.com/joelmwangangi/arima-model/blob/dad3babfff48d06d0d83371bc5199c6c32f92c5e/aapl_1y.csv"
 
-# Function to run the ARIMA model
-def run_arima(dataset, order):
-    if dataset is not None:
-        try:
-            # Assuming 'Close' column is relevant
-            data_series = dataset["Close"]
-            order = tuple(map(int, order.split(",")))
-            
-            # Fit ARIMA model
-            model = ARIMA(data_series, order=order)
-            results = model.fit()
+st.set_page_config(page_title="ARIMA Model GUI", layout="wide")
+st.title("ARIMA Model GUI")
 
-            # Display ARIMA results summary
-            st.write(f"ARIMA Model Summary:")
-            st.write(f"AIC: {results.aic:.2f}")
-            st.write(f"Model Summary: {results.summary()}")
-            
-            return results
-        except Exception as e:
-            st.error(f"An error occurred while fitting the ARIMA model: {e}")
-    else:
-        st.warning("No dataset loaded!")
-        return None
+@st.cache_data
+def load_data(url: str) -> pd.DataFrame:
+    df = pd.read_csv(url, parse_dates=["Date"])
+    return df
 
-# Function to plot the data
-def plot_data(dataset):
-    if dataset is not None:
-        plt.figure(figsize=(10, 6))
-        plt.plot(dataset["Date"], dataset["Close"], label="Close Price")
-        plt.title("Close Price Over Time")
-        plt.xlabel("Date")
-        plt.ylabel("Close Price")
-        plt.legend()
-        plt.grid()
-        st.pyplot(plt)
+# 2) Automatically load the data
+try:
+    df = load_data(DATA_URL)
+    st.success("Data loaded successfully!")
+except Exception as e:
+    st.error(f"Could not load data from URL:\n{e}")
+    st.stop()
 
-# Streamlit UI
-st.title("ARIMA Model Deployment")
+# 3) Show data preview
+st.subheader("Data Preview")
+st.dataframe(df.head())
 
-# Automatically load the data
-dataset = pd.read_csv('aapl_1y.csv', parse_dates=["Date"])
-st.write("Data Loaded Automatically from aapl_1y.csv")
+# Sidebar: model controls
+st.sidebar.header("Model Settings")
 
-# Show data preview
-st.write(dataset.head())
+order = st.sidebar.text_input(
+    "ARIMA order (p, d, q)",
+    value="1,1,1",
+    help="Enter three integers separated by commas, e.g. 1,1,1"
+)
 
-# Step 1: Enter ARIMA order (p, d, q)
-order = st.text_input("Enter ARIMA order (p, d, q)", "1,1,1")
+fit_button = st.sidebar.button("Fit ARIMA Model")
+results = None
+if fit_button:
+    try:
+        p, d, q = map(int, order.split(","))
+        series = df["Close"]
+        model = ARIMA(series, order=(p, d, q))
+        results = model.fit()
+        st.sidebar.success(f"Model fitted! AIC: {results.aic:.2f}")
+    except Exception as e:
+        st.sidebar.error(f"Failed to fit model: {e}")
 
-# Step 2: Run the ARIMA model
-if st.button("Run ARIMA Model"):
-    results = run_arima(dataset, order)
+# 4) Plot time series
+if st.sidebar.checkbox("Show Time Series Plot"):
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(df["Date"], df["Close"], label="Close Price")
+    ax.set_title("Close Price Over Time")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Close Price")
+    ax.grid(True)
+    st.pyplot(fig)
 
-# Step 3: Plot data
-if st.button("Plot Data"):
-    plot_data(dataset)
-
-# Step 4: Show forecast (optional)
+# 5) Summary & Forecast
 if results is not None:
-    st.write("Model Forecast:")
-    forecast_steps = st.slider("How many steps to forecast?", 1, 50, 10)
-    forecast = results.forecast(steps=forecast_steps)
-    st.write(f"Forecast for next {forecast_steps} steps:", forecast)
+    st.subheader("Model Summary")
+    st.text(results.summary().as_text())
+
+    st.subheader("Forecast")
+    steps = st.number_input("Forecast steps", min_value=1, max_value=100, value=10)
+    if st.button("Generate Forecast"):
+        fc = results.forecast(steps=steps)
+        st.line_chart(fc)
+        st.dataframe(pd.DataFrame({"Forecast": fc}))
