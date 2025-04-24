@@ -3,15 +3,23 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.arima.model import ARIMA
 import streamlit as st
 
-# 1) Configure your data source here:
-DATA_URL = "https://github.com/joelmwangangi/arima-model/blob/dad3babfff48d06d0d83371bc5199c6c32f92c5e/aapl_1y.csv"
-
 st.set_page_config(page_title="ARIMA Model GUI", layout="wide")
 st.title("ARIMA Model GUI")
 
+# 1) Configure your data source URL
+DATA_URL = "https://raw.githubusercontent.com/<username>/<repo>/main/aapl_1y.csv"
+
 @st.cache_data
 def load_data(url: str) -> pd.DataFrame:
-    df = pd.read_csv(url, parse_dates=["Date"])
+    df = pd.read_csv(url)
+    # Detect and normalize a date column
+    for col in ("Date", "date", "timestamp", "Datetime"):
+        if col in df.columns:
+            df["Date"] = pd.to_datetime(df[col])
+            break
+    else:
+        st.error("No date column found. Expected one of: Date, date, timestamp, Datetime.")
+        st.stop()
     return df
 
 # 2) Automatically load the data
@@ -22,7 +30,7 @@ except Exception as e:
     st.error(f"Could not load data from URL:\n{e}")
     st.stop()
 
-# 3) Show data preview
+# 3) Data preview
 st.subheader("Data Preview")
 st.dataframe(df.head())
 
